@@ -3,7 +3,6 @@ import js
 import sys
 from interface import coral_store
 
-jug.options.set_jugdir(coral_store())
 
 @jug.TaskGenerator
 def say(number):

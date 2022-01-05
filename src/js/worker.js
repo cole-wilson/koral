@@ -1,37 +1,19 @@
 importScripts("https://cdn.jsdelivr.net/pyodide/v0.18.1/full/pyodide.js");
 
-var stdinReadLength = null;
-
 config = {
-  entrypoint: "main.py",
+  backend: "https://192.168.0.81:8080",
   filesystem: {
-    base: "/",
+    baseURL: "/",
     files: ["main.py", "interface.py"]
-  }
+  },
+  entrypoint: "main.py",
 }
-
-
-function makeid(length) {
-    var result           = '';
-    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    var charactersLength = characters.length;
-    for ( var i = 0; i < length; i++ ) {
-      result += characters.charAt(Math.floor(Math.random() * 
- charactersLength));
-   }
-   return result;
-}
-
 
 function get(data) {
-  // let buffer = new Uint16Array(data);
   var request;
-  for (var i = 0; i< 6; i++) {
-    request = new XMLHttpRequest();
-    request.open('POST', 'http://192.168.0.81:8080/', false);  // `false` makes the request synchronous
-    request.send(data);
-    if (request.status == 200) break
-  }
+  request = new XMLHttpRequest();
+  request.open('POST', 'http://192.168.0.81:8080/', false);  // `false` makes the request synchronous
+  request.send(data);
   return request.responseText;
 }
 function sleep(amount) {
@@ -47,9 +29,7 @@ function stdin(amount) {
   request.send(null)
   return request.responseText;
 }
-function writeOutput(type, text) {
-  self.postMessage({type:type, content:text})
-}
+function writeOutput(type, text) {self.postMessage({type:type, content:text})}
 async function main() {
   pyodide = await loadPyodide({
     indexURL  : "https://cdn.jsdelivr.net/pyodide/v0.18.1/full/",
@@ -58,50 +38,19 @@ async function main() {
 
   let FS = pyodide.FS
   FS.registerDevice(FS.makedev(70, 0), {write: text => writeOutput("stdout", text)})
-  FS.mkdir("/main")
-  FS.mount(FS.filesystems.IDBFS, {}, "/main")
-  for (const filename of config.filesystem.files.values()) {
-    FS.createLazyFile("/main", filename, config.filesystem.base + filename, true, true)
-  }
+  FS.mkdir("/app")
+  FS.mount(FS.filesystems.IDBFS, {}, "/app")
+  for (const filename of config.filesystem.files.values())
+    FS.createLazyFile("/app", filename, config.filesystem.baseURL + filename, true, true)
+  FS.chdir("/app")
+
   pyodide.globals.set("config", config)
 
   await pyodide.loadPackage("micropip")
   await pyodide.runPython("import micropip")
   await pyodide.globals.get("micropip").install("https://cdn.jsdelivr.net/gh/cole-wilson/jug-wheel@main/Jug-2.1.1.post9-py3-none-any.whl")
-  await pyodide.runPython(`
-import sys
-import js
-
-class Input():
-  def read(self, amount):
-    return js.stdin(amount)
-  def readline(self):
-    return self.read(chr(10))
-
-class StandardPrinter():
-  def flush(self): ...
-  def write(self, text):
-    js.writeOutput("stdout", text)
-
-class ErrorPrinter():
-  def flush(self): ...
-  def write(self, text):
-    js.writeOutput("stderr", text)
-
-sys.stdout = StandardPrinter()
-sys.stderr = ErrorPrinter()
-sys.stdin = Input()
-
-import jug, os
-input()
-sys.argv = ["<jug runner>", "execute", config.entrypoint, "--will-cite"]
-try:
-  os.chdir("/main")
-  jug.jug.main()
-except SystemExit as err:
-  print('exited with code', 0 if err.code is None else err.code)
-  pass
-`,)
+  await pyodide.globals.get("micropip").install("koral")
+  await pyodide.runPython("from koral import run\nrun(config)")
 
 };
 
