@@ -1,4 +1,5 @@
 # koral
-this is still a work in progress, and is nowhere near ready for any sort of use
+this is an ongoing attempt to use Pyodide with the luispedro/jug project to create a distributed computing environment using browsers.
 
-please don't try yet!
+> [!WARNING]
+> This doesn't really work yet, and only contains some early progress.
